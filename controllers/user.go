@@ -25,7 +25,7 @@ func UserAll(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	us := models.User().All()
 
 	data := struct {
-		Total, Messenger, Telegram, IdleUser, BlockUser               int
+		Total, Telegram, IdleUser, BlockUser                          int
 		SubCount, BoardCount, KeywordCount, AuthorCount, PushSumCount int
 		User, Room, Group                                             int
 		Users                                                         []*user.User
@@ -35,9 +35,6 @@ func UserAll(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	for _, u := range us {
 		if !u.Enable {
 			data.BlockUser++
-		}
-		if u.Profile.Messenger != "" {
-			data.Messenger++
 		}
 		if u.Profile.Telegram != "" {
 			data.Telegram++

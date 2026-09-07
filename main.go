@@ -8,11 +8,9 @@ import (
 	"time"
 
 	log "github.com/Ptt-Alertor/logrus"
-	"github.com/google/gops/agent"
 	"github.com/julienschmidt/httprouter"
 	"github.com/robfig/cron"
 
-	"github.com/watain666/ptt-alertor/channels/messenger"
 	"github.com/watain666/ptt-alertor/channels/telegram"
 	ctrlr "github.com/watain666/ptt-alertor/controllers"
 	"github.com/watain666/ptt-alertor/jobs"
@@ -62,18 +60,9 @@ func main() {
 	startJobs()
 
 	router := newRouter()
-	m := messenger.New()
 
 	router.GET("/", ctrlr.Index)
-	// router.GET("/messenger", ctrlr.MessengerIndex)
 	router.GET("/telegram", ctrlr.TelegramIndex)
-	router.GET("/messenger", ctrlr.MessengerIndex)
-	router.GET("/redirect/:checksum", ctrlr.Redirect)
-	router.GET("/top", ctrlr.Top)
-	router.GET("/docs", ctrlr.Docs)
-
-	// websocket
-	router.GET("/ws", ctrlr.WebSocket)
 
 	router.POST("/broadcast", basicAuth(ctrlr.Broadcast))
 
@@ -100,17 +89,8 @@ func main() {
 	router.POST("/users", basicAuth(ctrlr.UserCreate))
 	router.PUT("/users/:account", basicAuth(ctrlr.UserModify))
 
-	// facebook messenger
-	router.GET("/messenger/webhook", m.Verify)
-	router.POST("/messenger/webhook", m.Received)
-
 	// telegram
 	router.POST("/telegram/"+telegramToken, telegram.HandleRequest)
-
-	// gops agent
-	if err := agent.Listen(agent.Options{Addr: ":6060", ShutdownCleanup: true}); err != nil {
-		log.Fatal(err)
-	}
 
 	// Web Server
 	log.Info("Web Server Start on Port 9090")
@@ -125,7 +105,7 @@ func main() {
 	}()
 
 	// graceful shutdown
-	quit := make(chan os.Signal)
+	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt)
 	<-quit
 	log.Info("Shutdown Web Server...")
@@ -143,7 +123,6 @@ func startJobs() {
 	go jobs.NewCommentChecker().Run()
 	go jobs.NewPttMonitor().Run()
 	c := cron.New()
-	c.AddJob("@hourly", jobs.NewTop())
 	c.AddJob("@every 48h", jobs.NewPushSumKeyReplacer())
 	c.Start()
 }
@@ -151,11 +130,7 @@ func startJobs() {
 func init() {
 	// for initial app
 	jobs.NewPushSumKeyReplacer().Run()
-	jobs.NewMigrateBoard(map[string]string{}).Run()
-	jobs.NewTop().Run()
-	jobs.NewCacheCleaner().Run()
 	jobs.NewGenerator().Run()
 	jobs.NewFetcher().Run()
-	jobs.NewMigrateDB().Run()
 	jobs.NewCategoryCleaner().Run()
 }

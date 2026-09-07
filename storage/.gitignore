@@ -1,0 +1,5 @@
+# SQLite database file (created at runtime; see SQLITE_PATH in .env.example)
+*.db
+*.db-journal
+*.db-shm
+*.db-wal

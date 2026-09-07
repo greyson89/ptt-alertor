@@ -1,16 +1,14 @@
 package pushsum
 
 import (
+	"database/sql"
 	"strconv"
 	"strings"
 
 	log "github.com/Ptt-Alertor/logrus"
-	"github.com/garyburd/redigo/redis"
 	"github.com/watain666/ptt-alertor/connections"
 	"github.com/watain666/ptt-alertor/myutil"
 )
-
-const prefix string = "pushsum:"
 
 var NumTextMap = map[int]string{
 	100:  "爆",
@@ -39,30 +37,36 @@ func ConvertPushCount(str string) int {
 	return cnt
 }
 
-func List() []string {
-	conn := connections.Redis()
-	defer conn.Close()
-	boards, err := redis.Strings(conn.Do("SMEMBERS", prefix+"boards"))
+func List() (boards []string) {
+	rows, err := connections.DB().Query("SELECT board FROM pushsum_boards")
 	if err != nil {
 		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
+		return boards
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var board string
+		if err := rows.Scan(&board); err != nil {
+			log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
+			continue
+		}
+		boards = append(boards, board)
 	}
 	return boards
 }
 
 func Exist(board string) bool {
-	conn := connections.Redis()
-	defer conn.Close()
-	bl, err := redis.Bool(conn.Do("SISMEMBER", prefix+"boards", board))
-	if err != nil {
+	var exists int
+	err := connections.DB().QueryRow("SELECT 1 FROM pushsum_boards WHERE board = ?", board).Scan(&exists)
+	if err != nil && err != sql.ErrNoRows {
 		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
 	}
-	return bl
+	return exists == 1
 }
 
 func Add(board string) error {
-	conn := connections.Redis()
-	defer conn.Close()
-	_, err := conn.Do("SADD", prefix+"boards", board)
+	_, err := connections.DB().Exec("INSERT OR IGNORE INTO pushsum_boards (board) VALUES (?)", board)
 	if err != nil {
 		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
 	}
@@ -70,9 +74,7 @@ func Add(board string) error {
 }
 
 func Remove(board string) error {
-	conn := connections.Redis()
-	defer conn.Close()
-	_, err := conn.Do("SREM", prefix+"boards", board)
+	_, err := connections.DB().Exec("DELETE FROM pushsum_boards WHERE board = ?", board)
 	if err != nil {
 		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
 	}
@@ -80,9 +82,9 @@ func Remove(board string) error {
 }
 
 func AddSubscriber(board, account string) error {
-	conn := connections.Redis()
-	defer conn.Close()
-	_, err := conn.Do("SADD", prefix+board+":subs", account)
+	_, err := connections.DB().Exec(
+		"INSERT OR IGNORE INTO pushsum_subscribers (board, account) VALUES (?, ?)", board, account,
+	)
 	if err != nil {
 		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
 	}
@@ -90,125 +92,136 @@ func AddSubscriber(board, account string) error {
 }
 
 func RemoveSubscriber(board, account string) error {
-	conn := connections.Redis()
-	defer conn.Close()
-	_, err := conn.Do("SREM", prefix+board+":subs", account)
+	_, err := connections.DB().Exec(
+		"DELETE FROM pushsum_subscribers WHERE board = ? AND account = ?", board, account,
+	)
 	if err != nil {
 		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
 	}
 	return err
 }
 
-func ListSubscribers(board string) []string {
-	conn := connections.Redis()
-	defer conn.Close()
-	subs, err := redis.Strings(conn.Do("SMEMBERS", prefix+board+":subs"))
+func ListSubscribers(board string) (subs []string) {
+	rows, err := connections.DB().Query(
+		"SELECT account FROM pushsum_subscribers WHERE board = ?", board,
+	)
 	if err != nil {
 		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
+		return subs
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var account string
+		if err := rows.Scan(&account); err != nil {
+			log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
+			continue
+		}
+		subs = append(subs, account)
 	}
 	return subs
 }
 
 func Destroy(board string) error {
-	key := prefix + board + ":subs"
-	conn := connections.Redis()
-	defer conn.Close()
-	_, err := conn.Do("DEL", key)
+	_, err := connections.DB().Exec("DELETE FROM pushsum_subscribers WHERE board = ?", board)
 	if err != nil {
 		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
 	}
 	return err
 }
 
+// DiffList reports which of the given article ids have not yet been notified
+// about for this account/board/kind, then remembers them as notified.
+//
+// A "generation" is either the current accumulating set ("base") or the
+// previous one kept around to avoid re-notifying right after a reset
+// ("bench", see ReplaceBenchKeys). The very first call for a combination
+// only establishes the baseline and reports nothing, matching the previous
+// Redis-backed behaviour.
 func DiffList(account, board, kind string, ids ...int) []int {
 	if len(ids) == 0 {
 		return []int{}
 	}
-	nowKey := prefix + account + ":" + board + ":" + kind + ":now"
-	baseKey := prefix + account + ":" + board + ":" + kind + ":base"
-	benchKey := prefix + account + ":" + board + ":" + kind + ":bench"
-	conn := connections.Redis()
-	defer conn.Close()
-	bl, err := redis.Bool(conn.Do("EXISTS", baseKey))
-	conn.Send("MULTI")
-	conn.Send("SADD", redis.Args{}.Add(nowKey).AddFlat(ids)...)
-	conn.Send("SDIFF", nowKey, baseKey, benchKey)
-	conn.Send("DEL", nowKey)
-	r, err := redis.Values(conn.Do("EXEC"))
+
+	db := connections.DB()
+
+	var baseExists int
+	err := db.QueryRow(
+		`SELECT 1 FROM pushsum_diff_ids
+		 WHERE account = ? AND board = ? AND kind = ? AND generation = 'base' LIMIT 1`,
+		account, board, kind,
+	).Scan(&baseExists)
+	if err != nil && err != sql.ErrNoRows {
+		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
+	}
+
+	known := make(map[int]bool)
+	rows, err := db.Query(
+		`SELECT article_id FROM pushsum_diff_ids
+		 WHERE account = ? AND board = ? AND kind = ? AND generation IN ('base', 'bench')`,
+		account, board, kind,
+	)
 	if err != nil {
 		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
 		return []int{}
 	}
-	ids, err = redis.Ints(r[1], err)
-	if len(ids) > 0 {
-		_, err = conn.Do("SADD", redis.Args{}.Add(baseKey).AddFlat(ids)...)
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
+			continue
+		}
+		known[id] = true
 	}
-	if err != nil {
-		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
+	rows.Close()
+
+	newIDs := make([]int, 0)
+	for _, id := range ids {
+		if !known[id] {
+			newIDs = append(newIDs, id)
+		}
 	}
-	if !bl {
+
+	for _, id := range newIDs {
+		if _, err := db.Exec(
+			`INSERT OR IGNORE INTO pushsum_diff_ids (account, board, kind, generation, article_id)
+			 VALUES (?, ?, ?, 'base', ?)`,
+			account, board, kind, id,
+		); err != nil {
+			log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
+		}
+	}
+
+	if baseExists != 1 {
 		return []int{}
 	}
-	return ids
+	return newIDs
 }
 
 func DelDiffList(account, board, kind string) error {
-	preKeyTemplate := prefix + account + ":" + board + ":" + kind + ":*"
-	conn := connections.Redis()
-	defer conn.Close()
-	preKeys, err := redis.Strings(conn.Do("KEYS", preKeyTemplate))
-	if len(preKeys) > 0 {
-		_, err = conn.Do("DEL", redis.Args{}.AddFlat(preKeys)...)
-	}
+	_, err := connections.DB().Exec(
+		"DELETE FROM pushsum_diff_ids WHERE account = ? AND board = ? AND kind = ?",
+		account, board, kind,
+	)
 	if err != nil {
 		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
 	}
 	return err
 }
 
+// ReplaceBenchKeys periodically rotates every account/board/kind's "base"
+// generation into "bench", discarding the previous bench. This is what lets
+// still-high articles be re-notified after a while instead of being
+// suppressed forever.
 func ReplaceBenchKeys() error {
-	baseKeyTemplate := prefix + "*:*:*:base"
-	conn := connections.Redis()
-	defer conn.Close()
-	baseKeys, err := redis.Strings(conn.Do("KEYS", baseKeyTemplate))
-	for _, baseKey := range baseKeys {
-		key := strings.TrimSuffix(baseKey, "base") + "bench"
-		conn.Send("WATCH", key)
-		conn.Send("MULTI")
-		conn.Send("RENAME", baseKey, key)
-		_, err = conn.Do("EXEC")
-		if err != nil {
-			log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
-		}
+	db := connections.DB()
+	if _, err := db.Exec("DELETE FROM pushsum_diff_ids WHERE generation = 'bench'"); err != nil {
+		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
+		return err
 	}
-	return err
-}
-
-func RenameDiffListKeys(preBoard, postBoard string) error {
-	keyTemplate := prefix + "*:" + preBoard + ":*"
-	conn := connections.Redis()
-	defer conn.Close()
-	keys, err := redis.Strings(conn.Do("KEYS", keyTemplate))
-	for _, key := range keys {
-		if postBoard == "" {
-			_, err = conn.Do("DEL", key)
-			continue
-		}
-		newKey := strings.Replace(key, preBoard, postBoard, -1)
-		bl, err := redis.Bool(conn.Do("EXISTS", newKey))
-		if err == nil {
-			if bl {
-				_, err = conn.Do("DEL", key)
-			} else {
-				conn.Send("WATCH", key)
-				conn.Send("MULTI")
-				conn.Send("RENAME", key, newKey)
-				_, err = conn.Do("EXEC")
-			}
-		}
-		if err != nil {
-			log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
-		}
+	if _, err := db.Exec("UPDATE pushsum_diff_ids SET generation = 'bench' WHERE generation = 'base'"); err != nil {
+		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
+		return err
 	}
-	return err
+	return nil
 }

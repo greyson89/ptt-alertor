@@ -1,5 +1,5 @@
 總人數：{{.Total}}
-Messenger: {{.Messenger}}, Telegram: {{.Telegram}}
+Telegram: {{.Telegram}}
 BlockUser: {{.BlockUser}}, IdleUser: {{.IdleUser}}
 User: {{.User}}, Room: {{.Room}}, Group: {{.Group}}
 count(Board): {{.BoardCount}}, count(Keyword): {{.KeywordCount}}, count(Author): {{.AuthorCount}}, count(PushSum): {{.PushSumCount}}

@@ -8,9 +8,7 @@ import (
 )
 
 var platforms = map[string]bool{
-	"email":     true,
-	"messenger": true,
-	"telegram":  true,
+	"telegram": true,
 }
 
 type Broadcaster struct {
@@ -33,27 +31,11 @@ func (bc Broadcaster) Send(plfms []string) error {
 
 	for _, u := range models.User().All() {
 		bc.subType = "broadcast"
-		if platformBl["messenger"] {
-			go bc.sendMessenger(u)
-		}
 		if platformBl["telegram"] {
 			go bc.sendTelegram(u)
 		}
-		if platformBl["email"] {
-			go bc.sendEmail(u)
-		}
 	}
 	return nil
-}
-
-func (bc Broadcaster) sendEmail(u *user.User) {
-	bc.Profile.Email = u.Profile.Email
-	ckCh <- bc
-}
-
-func (bc Broadcaster) sendMessenger(u *user.User) {
-	bc.Profile.Messenger = u.Profile.Messenger
-	ckCh <- bc
 }
 
 func (bc Broadcaster) sendTelegram(u *user.User) {

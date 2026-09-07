@@ -4,64 +4,17 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      REDIS_ENDPOINT: ${REDIS_ENDPOINT:-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
-      DB_CONNECTION: ${DB_CONNECTION:-http://dynamodb-local:8000}
-      AWS_REGION: ${AWS_REGION:-us-west-2}
+      SQLITE_PATH: ${SQLITE_PATH:-/storage/ptt-alertor.db}
       APP_HOST: ${APP_HOST:-http://localhost:9090}
-      APP_WS_HOST: ${APP_WS_HOST:-ws://localhost:9090/ws}
-      S3_DOMAIN: ${S3_DOMAIN:-}
       AUTH_USER: ${AUTH_USER:-admin}
       AUTH_PW: ${AUTH_PW:-changeme}
       BOARD_HIGH: ${BOARD_HIGH:-Gossiping,LoL}
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN:-}
-      MESSENGER_ACCESSTOKEN: ${MESSENGER_ACCESSTOKEN:-}
-      MESSENGER_VERIFYTOKEN: ${MESSENGER_VERIFYTOKEN:-}
-      MAILGUN_DOMAIN: ${MAILGUN_DOMAIN:-}
-      MAILGUN_APIKEY: ${MAILGUN_APIKEY:-}
-      MAILGUN_PUBLIC_APIKEY: ${MAILGUN_PUBLIC_APIKEY:-}
     ports:
       - "9090:9090"
-      - "6060:6060"
-    depends_on:
-      redis:
-        condition: service_healthy
-      dynamodb-init:
-        condition: service_completed_successfully
-    restart: unless-stopped
-
-  redis:
-    image: redis:7-alpine
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
     volumes:
-      - redis-data:/data
+      - sqlite-data:/storage
     restart: unless-stopped
-
-  dynamodb-local:
-    image: amazon/dynamodb-local:2.5.2
-    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb"]
-    ports:
-      - "8000:8000"
-    restart: unless-stopped
-
-  dynamodb-init:
-    image: amazon/aws-cli:latest
-    env_file:
-      - .env
-    environment:
-      DB_CONNECTION: ${DB_CONNECTION:-http://dynamodb-local:8000}
-      AWS_REGION: ${AWS_REGION:-us-west-2}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-local}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-local}
-    depends_on:
-      - dynamodb-local
-    volumes:
-      - ./docker/init-dynamodb.sh:/init-dynamodb.sh:ro
-    entrypoint: ["/bin/sh", "/init-dynamodb.sh"]
 
 volumes:
-  redis-data:
+  sqlite-data:

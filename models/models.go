@@ -7,11 +7,11 @@ import (
 )
 
 var User = func() *user.User {
-	return user.NewUser(new(user.Redis))
+	return user.NewUser(new(user.SQLite))
 }
 var Article = func() *article.Article {
-	return article.NewArticle(new(article.DynamoDB))
+	return article.NewArticle(new(article.SQLite))
 }
 var Board = func() *board.Board {
-	return board.NewBoard(new(board.DynamoDB), new(board.Redis))
+	return board.NewBoard(new(board.SQLite), new(board.SQLite))
 }

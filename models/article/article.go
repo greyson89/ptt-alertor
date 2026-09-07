@@ -1,6 +1,7 @@
 package article
 
 import (
+	"database/sql"
 	"regexp"
 	"strconv"
 	"strings"
@@ -10,14 +11,10 @@ import (
 	"fmt"
 
 	log "github.com/Ptt-Alertor/logrus"
-	"github.com/garyburd/redigo/redis"
 	"github.com/watain666/ptt-alertor/connections"
 	"github.com/watain666/ptt-alertor/models/pushsum"
 	"github.com/watain666/ptt-alertor/myutil"
 )
-
-const prefix = "article:"
-const subsSuffix = ":subs"
 
 type Article struct {
 	ID               int    `json:"ID,omitempty"`
@@ -79,14 +76,15 @@ func (a Article) MatchKeyword(keyword string) bool {
 
 // Exist check article exist or not
 func (a Article) Exist() (bool, error) {
-	conn := connections.Redis()
-	defer conn.Close()
-
-	bl, err := redis.Bool(conn.Do("EXISTS", prefix+a.Code+subsSuffix, "board"))
-	if err != nil {
+	var exists int
+	err := connections.DB().QueryRow(
+		"SELECT 1 FROM article_subscribers WHERE code = ? LIMIT 1", a.Code,
+	).Scan(&exists)
+	if err != nil && err != sql.ErrNoRows {
 		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
+		return false, err
 	}
-	return bl, err
+	return exists == 1, nil
 }
 
 func (a Article) Find(code string) Article {
@@ -103,10 +101,7 @@ func (a Article) Destroy() error {
 		return err
 	}
 
-	conn := connections.Redis()
-	defer conn.Close()
-
-	_, err := conn.Do("DEL", prefix+a.Code+subsSuffix)
+	_, err := connections.DB().Exec("DELETE FROM article_subscribers WHERE code = ?", a.Code)
 	if err != nil {
 		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
 	}
@@ -114,32 +109,40 @@ func (a Article) Destroy() error {
 }
 
 func (a Article) AddSubscriber(account string) error {
-	conn := connections.Redis()
-	defer conn.Close()
-
-	_, err := conn.Do("SADD", prefix+a.Code+subsSuffix, account)
+	_, err := connections.DB().Exec(
+		"INSERT OR IGNORE INTO article_subscribers (code, account) VALUES (?, ?)", a.Code, account,
+	)
 	if err != nil {
 		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
 	}
 	return err
 }
 
-func (a Article) Subscribers() ([]string, error) {
-	conn := connections.Redis()
-	defer conn.Close()
-
-	accounts, err := redis.Strings(conn.Do("SMEMBERS", prefix+a.Code+subsSuffix))
+func (a Article) Subscribers() (accounts []string, err error) {
+	rows, err := connections.DB().Query(
+		"SELECT account FROM article_subscribers WHERE code = ?", a.Code,
+	)
 	if err != nil {
 		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
+		return accounts, err
 	}
-	return accounts, err
+	defer rows.Close()
+
+	for rows.Next() {
+		var account string
+		if err := rows.Scan(&account); err != nil {
+			log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
+			continue
+		}
+		accounts = append(accounts, account)
+	}
+	return accounts, nil
 }
 
 func (a Article) RemoveSubscriber(sub string) error {
-	conn := connections.Redis()
-	defer conn.Close()
-
-	_, err := conn.Do("SREM", prefix+a.Code+subsSuffix, sub)
+	_, err := connections.DB().Exec(
+		"DELETE FROM article_subscribers WHERE code = ? AND account = ?", a.Code, sub,
+	)
 	if err != nil {
 		log.WithField("runtime", myutil.BasicRuntimeInfo()).WithError(err).Error()
 	}

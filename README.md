@@ -11,24 +11,31 @@
 
 ## Docker Deployment
 
+Ptt-Alertor persists all of its data (users, subscriptions, boards, articles) in a
+single SQLite file — no Redis, DynamoDB, or Postgres required.
+
 1. (Optional) copy env template if you want to customize settings:
 
 ```bash
 cp .env.example .env
 ```
 
-2. Update `.env` if you need real channel tokens / secrets.
+2. Update `.env` with your Telegram bot token (see [@BotFather](https://t.me/BotFather))
+   and other settings.
 
-3. Start all services (app + redis + dynamodb-local):
+3. Start the app:
 
 ```bash
 docker compose up --build -d
 ```
 
+The SQLite database is stored on the `sqlite-data` named volume (`/storage/ptt-alertor.db`
+inside the container), so it survives container rebuilds. To back it up, copy that file out
+of the volume; to reset all data, remove the volume.
+
 4. Open app:
 
 - http://localhost:9090
-- docs page: http://localhost:9090/docs
 
 5. Stop services:
 
@@ -74,7 +81,8 @@ docker compose down
 {
   "profile": {
     "account": "sample",
-    "email": "sample@mail.com"
+    "telegram": "sample",
+    "telegramChat": 123456789
   },
   "subscribes": [
     {
@@ -95,7 +103,8 @@ docker compose down
 {
   "profile": {
     "account": "sample",
-    "email": "sample@mail.com"
+    "telegram": "sample",
+    "telegramChat": 123456789
   },
   "subscribes": []
 }

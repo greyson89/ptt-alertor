@@ -30,8 +30,8 @@ func TestUser_Save(t *testing.T) {
 		u       User
 		wantErr bool
 	}{
-		{"ok", User{Profile: Profile{Account: "liam.lai@gmail.com", Email: "liam.lai@gmail.com"}, drive: new(Mock)}, false},
-		{"duplicate", User{Profile: Profile{Account: "admin@tiaui.co", Email: "admin@tiaui.co"}, drive: new(Mock)}, true},
+		{"ok", User{Profile: Profile{Account: "liam.lai", Telegram: "liam.lai"}, drive: new(Mock)}, false},
+		{"duplicate", User{Profile: Profile{Account: "admin@tiaui.co", Telegram: "admin"}, drive: new(Mock)}, true},
 		{"not enough data", User{Profile: Profile{Account: "admin@tiaui.co"}, drive: new(Mock)}, true},
 	}
 	for _, tt := range tests {

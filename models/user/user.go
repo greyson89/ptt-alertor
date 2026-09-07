@@ -19,8 +19,6 @@ type User struct {
 type Profile struct {
 	Account      string `json:"account"`
 	Type         string `json:"type,omitempty"`
-	Email        string `json:"email"`
-	Messenger    string `json:"messenger"`
 	Telegram     string `json:"telegram"`
 	TelegramChat int64  `json:"telegramChat"`
 }
@@ -60,8 +58,8 @@ func (u User) Save() error {
 		return ErrAccountEmpty
 	}
 
-	if u.Profile.Email == "" && u.Profile.Messenger == "" && u.Profile.Telegram == "" {
-		return errors.New("one of Email, Messenger and Telegram have to be filled")
+	if u.Profile.Telegram == "" {
+		return errors.New("Telegram has to be filled")
 	}
 	u.CreateTime = time.Now()
 	u.UpdateTime = time.Now()

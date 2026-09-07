@@ -18,7 +18,6 @@ import (
 	"github.com/watain666/ptt-alertor/models/article"
 	"github.com/watain666/ptt-alertor/models/board"
 	"github.com/watain666/ptt-alertor/models/subscription"
-	"github.com/watain666/ptt-alertor/models/top"
 	"github.com/watain666/ptt-alertor/models/user"
 )
 
@@ -37,7 +36,6 @@ var Commands = map[string]map[string]string{
 	"一般": {
 		"指令": "可使用的指令清單",
 		"清單": "設定的看板、關鍵字、作者",
-		"排行": "前五名追蹤的關鍵字、作者",
 	},
 	"關鍵字相關": {
 		"新增 看板 關鍵字": "新增追蹤關鍵字",
@@ -58,9 +56,6 @@ var Commands = map[string]map[string]string{
 		"新增推文 網址": "新增推文追蹤",
 		"刪除推文 網址": "刪除推文追蹤",
 		"範例":      "新增推文 https://www.ptt.cc/bbs/EZsoft/M.1708247900.A.27C.html",
-	},
-	"進階應用": {
-		"參考連結": "https://ptt-alertor.tiaui.co/docs",
 	},
 }
 
@@ -91,8 +86,6 @@ func HandleCommand(text string, userID string, isUser bool) string {
 		return handleList(userID)
 	case "指令", "help":
 		return stringCommands()
-	case "排行", "ranking":
-		return listTop()
 	case "新增", "刪除":
 		re := regexp.MustCompile("^(新增|刪除)\\s+([^,，][\\w-_,，\\.]*[^,，:\\s]):?\\s+(\\*|.*[^\\s])")
 		if matched := re.MatchString(text); !matched {
@@ -322,23 +315,6 @@ func stringCommands() string {
 	return strings.TrimSpace(str)
 }
 
-func listTop() string {
-	content := "關鍵字"
-	for i, keyword := range top.ListKeywords(5) {
-		content += fmt.Sprintf("\n%d. %s", i+1, keyword)
-	}
-	content += "\n----\n作者"
-	for i, author := range top.ListAuthors(5) {
-		content += fmt.Sprintf("\n%d. %s", i+1, author)
-	}
-	content += "\n----\n推噓文"
-	for i, pushSum := range top.ListPushSum(5) {
-		content += fmt.Sprintf("\n%d. %s", i+1, pushSum)
-	}
-	content += "\n\nTOP 100:\nhttps://ptt-alertor.tiaui.co/top"
-	return content
-}
-
 func handleKeyword(command, userID, board, keywordStr string) (string, error) {
 	boardNames := splitParamString(board)
 	input := keywordStr
@@ -542,16 +518,6 @@ func update(action updateAction, account string, boardNames []string, inputs ...
 	return nil
 }
 
-func HandleMessengerFollow(id string) error {
-	u := models.User().Find(id)
-	u.Profile.Messenger = id
-	log.WithFields(log.Fields{
-		"id":       id,
-		"platform": "messenger",
-	}).Info("User Join")
-	return handleFollow(u)
-}
-
 func HandleTelegramFollow(id string, chatID int64) error {
 	u := models.User().Find(id)
 	u.Profile.Telegram = id
@@ -568,9 +534,6 @@ func handleFollow(u user.User) error {
 		u.Enable = true
 		u.Update()
 	} else {
-		if u.Profile.Messenger != "" {
-			u.Profile.Account = u.Profile.Messenger
-		}
 		if u.Profile.Telegram != "" {
 			u.Profile.Account = u.Profile.Telegram
 		}

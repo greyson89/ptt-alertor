@@ -13,9 +13,10 @@ FROM alpine:3.20
 RUN apk add --no-cache ca-certificates
 WORKDIR /
 
+RUN mkdir -p /storage
 COPY public ./public
 COPY --from=builder /ptt-alertor /ptt-alertor
 
-EXPOSE 9090 6060
+EXPOSE 9090
 
 ENTRYPOINT ["/ptt-alertor"]

@@ -32,7 +32,6 @@
     <ul class="list-disc">
         <li><code>指令</code>：可使用的指令清單</li>
         <li><code>清單</code>：設定的看板、關鍵字、作者</li>
-        <li><code>排行</code>：前五名追蹤的關鍵字、作者</li>
     </ul>
 </article>
 {{end}}

@@ -30,7 +30,7 @@ jobs:
           GO111MODULE: on
         run: |
           go get
-          go test -race -tags test -coverprofile=coverage.txt -covermode=atomic ./...
+          go test -race -coverprofile=coverage.txt -covermode=atomic ./...
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v1

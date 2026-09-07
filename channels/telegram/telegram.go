@@ -100,7 +100,6 @@ func handleCallbackQuery(update tgbotapi.Update) {
 
 // help - 所有指令清單
 // list - 設定清單
-// ranking - 熱門關鍵字、作者、推文數
 // add - 新增看板關鍵字、作者、推文數
 // del - 刪除看板關鍵字、作者、推文數
 // showkeyboard - 顯示快捷小鍵盤
@@ -121,8 +120,6 @@ func handleCommand(update tgbotapi.Update) {
 		responseText = command.HandleCommand("help", userID, true)
 	case "list":
 		responseText = command.HandleCommand("list", userID, true)
-	case "ranking":
-		responseText = command.HandleCommand("ranking", userID, true)
 	case "showkeyboard":
 		showReplyKeyboard(chatID)
 		return
@@ -193,7 +190,6 @@ func showReplyKeyboard(chatID int64) {
 		tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton("清單"),
 			tgbotapi.NewKeyboardButton("推文清單"),
-			tgbotapi.NewKeyboardButton("排行"),
 			tgbotapi.NewKeyboardButton("指令"),
 		))
 	msg := tgbotapi.NewMessage(chatID, "顯示小鍵盤")
