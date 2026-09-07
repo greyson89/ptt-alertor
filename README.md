@@ -63,11 +63,17 @@ go build -o ptt-alertor .          # or ptt-alertor.exe on Windows
    outside Docker Compose) and run it. On Windows, copy `run.ps1.example` to
    `run.ps1`, fill in your settings, and run `.\run.ps1`.
 
-4. `APP_HOST` must start with `https://` for the Telegram webhook to be
-   registered. On a machine without a public HTTPS domain (e.g. your own PC),
-   expose port 9090 through a tunnel such as [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
-   or [ngrok](https://ngrok.com/) and set `APP_HOST` to that tunnel's URL —
-   otherwise the bot can send messages but won't receive your commands.
+4. Telegram connection mode is chosen automatically from `APP_HOST`:
+   - `APP_HOST` starts with `https://` → **webhook** mode: Telegram pushes
+     updates to `POST /telegram/:token`. This needs a publicly reachable
+     HTTPS URL — a real domain, or a tunnel such as
+     [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+     or [ngrok](https://ngrok.com/).
+   - Otherwise (e.g. `http://localhost:9090`, the default for local/native
+     runs) → **long polling** mode: the app itself repeatedly asks Telegram
+     for new updates. No public URL, port forwarding, or TLS certificate
+     needed — this is what you want when running on your own PC with no
+     domain, and it's the default for exactly that reason.
 
 5. To keep it running in the background on Windows, wrap it as a service with
    [NSSM](https://nssm.cc/) or schedule it to start at login via Task Scheduler.

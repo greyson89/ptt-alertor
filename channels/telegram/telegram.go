@@ -39,22 +39,56 @@ func init() {
 	// bot.Debug = true
 	log.Info("Telegram Authorized on " + bot.Self.UserName)
 
-	if !strings.HasPrefix(strings.ToLower(host), "https://") {
-		log.WithField("APP_HOST", host).Warn("Skip Telegram webhook setup: APP_HOST must be https")
+	if strings.HasPrefix(strings.ToLower(host), "https://") {
+		startWebhook()
 		return
 	}
 
+	log.WithField("APP_HOST", host).Info("APP_HOST is not https, using long polling instead of webhook")
+	startPolling()
+}
+
+// startWebhook has Telegram push updates to POST /telegram/:token. It needs
+// a publicly reachable https APP_HOST (a real domain, or a tunnel such as
+// Cloudflare Tunnel/ngrok) — see startPolling for the alternative that
+// works without one.
+func startWebhook() {
 	webhookConfig := tgbotapi.NewWebhook(host + "/telegram/" + token)
 	webhookConfig.MaxConnections = 100
-	_, err = bot.SetWebhook(webhookConfig)
-	if err != nil {
-		log.WithError(err).Warn("Telegram Bot Set Webhook Failed, continue without webhook")
+	if _, err := bot.SetWebhook(webhookConfig); err != nil {
+		log.WithError(err).Warn("Telegram Bot Set Webhook Failed, falling back to long polling")
+		startPolling()
 		return
 	}
 	log.Info("Telegram Bot Sets Webhook Success")
 }
 
-// HandleRequest handles request from webhook
+// startPolling has the bot repeatedly ask Telegram for new updates instead
+// of receiving them pushed in - no public URL, port forwarding, or TLS
+// certificate needed, which makes it the default when APP_HOST isn't https
+// (e.g. running locally on a machine with no domain).
+func startPolling() {
+	if _, err := bot.RemoveWebhook(); err != nil {
+		log.WithError(err).Warn("Telegram Bot Remove Webhook Failed")
+	}
+
+	u := tgbotapi.NewUpdate(0)
+	u.Timeout = 60
+	updates, err := bot.GetUpdatesChan(u)
+	if err != nil {
+		log.WithError(err).Error("Telegram Bot Start Long Polling Failed, telegram channel disabled")
+		return
+	}
+
+	go func() {
+		for update := range updates {
+			processUpdate(update)
+		}
+	}()
+	log.Info("Telegram Bot Long Polling Started")
+}
+
+// HandleRequest handles a webhook request from Telegram (startWebhook mode).
 func HandleRequest(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	if bot == nil {
 		http.Error(w, "telegram channel disabled", http.StatusServiceUnavailable)
@@ -68,7 +102,12 @@ func HandleRequest(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 
 	var update tgbotapi.Update
 	json.Unmarshal(bytes, &update)
+	processUpdate(update)
+}
 
+// processUpdate handles one update regardless of how it arrived (webhook
+// push or long-polling pull).
+func processUpdate(update tgbotapi.Update) {
 	if update.CallbackQuery != nil {
 		handleCallbackQuery(update)
 		return
