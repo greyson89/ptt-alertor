@@ -73,9 +73,11 @@ func UserCreate(w http.ResponseWriter, r *http.Request, params httprouter.Params
 	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
 		myutil.LogJSONDecode(err, r.Body)
 		http.Error(w, "not a json valid format", 400)
+		return
 	}
 	if err := u.Save(); err != nil {
 		http.Error(w, err.Error(), 400)
+		return
 	}
 }
 
@@ -85,14 +87,16 @@ func UserModify(w http.ResponseWriter, r *http.Request, params httprouter.Params
 	if err := json.NewDecoder(r.Body).Decode(&u); err != nil {
 		myutil.LogJSONDecode(err, r.Body)
 		http.Error(w, "not a json valid format", 400)
+		return
 	}
 
 	if u.Profile.Account != account {
 		http.Error(w, "account does not match", 400)
+		return
 	}
 
 	if err := u.Update(); err != nil {
 		http.Error(w, err.Error(), 400)
+		return
 	}
-
 }
