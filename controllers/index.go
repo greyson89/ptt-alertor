@@ -3,25 +3,38 @@ package controllers
 import (
 	"html/template"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/watain666/ptt-alertor/models/counter"
+	"github.com/watain666/ptt-alertor/myutil"
 )
 
-var tpls = []string{
-	"public/telegram.html",
-	"public/tpls/head.tpl",
-	"public/tpls/header.tpl",
-	"public/tpls/slogan.tpl",
-	"public/tpls/command.tpl",
-	"public/tpls/counter.tpl",
-	"public/tpls/footer.tpl",
-	"public/tpls/script.tpl",
+var tplNames = []string{
+	"telegram.html",
+	"tpls/head.tpl",
+	"tpls/header.tpl",
+	"tpls/slogan.tpl",
+	"tpls/command.tpl",
+	"tpls/counter.tpl",
+	"tpls/footer.tpl",
+	"tpls/script.tpl",
 }
 
-var templates = template.Must(template.ParseFiles(tpls...))
+var templates = template.Must(template.ParseFiles(tplPaths()...))
+
+// tplPaths resolves the template files against myutil.PublicPath() rather
+// than a bare relative path, so the binary finds them next to itself even
+// when launched with a different working directory.
+func tplPaths() []string {
+	paths := make([]string, len(tplNames))
+	for i, name := range tplNames {
+		paths[i] = filepath.Join(myutil.PublicPath(), name)
+	}
+	return paths
+}
 
 // Index Handles router "/" request
 func Index(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {

@@ -3,9 +3,11 @@ package connections
 import (
 	"database/sql"
 	"os"
+	"path/filepath"
 	"sync"
 
 	log "github.com/Ptt-Alertor/logrus"
+	"github.com/watain666/ptt-alertor/myutil"
 	_ "modernc.org/sqlite"
 )
 
@@ -14,13 +16,14 @@ var (
 	dbOnce sync.Once
 )
 
-// sqlitePath returns the database file location. Defaults to storage/ptt-alertor.db
-// under the project root, overridable with SQLITE_PATH (":memory:" is valid for tests).
+// sqlitePath returns the database file location. Defaults to ptt-alertor.db
+// under myutil.StoragePath() (next to the binary, or the project root during
+// `go run`/tests), overridable with SQLITE_PATH (":memory:" is valid for tests).
 func sqlitePath() string {
 	if path := os.Getenv("SQLITE_PATH"); path != "" {
 		return path
 	}
-	return "storage/ptt-alertor.db"
+	return filepath.Join(myutil.StoragePath(), "ptt-alertor.db")
 }
 
 const schema = `
@@ -84,7 +87,14 @@ CREATE TABLE IF NOT EXISTS counters (
 `
 
 func newDB() *sql.DB {
-	d, err := sql.Open("sqlite", sqlitePath())
+	path := sqlitePath()
+	if dir := filepath.Dir(path); dir != "." && dir != "" {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	d, err := sql.Open("sqlite", path)
 	if err != nil {
 		log.Fatal(err)
 	}

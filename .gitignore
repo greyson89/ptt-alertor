@@ -45,3 +45,5 @@ ptt-alertor
 # app
 .env*
 !.env.example
+run.ps1
+!run.ps1.example

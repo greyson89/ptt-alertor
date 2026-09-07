@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"path/filepath"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/watain666/ptt-alertor/models"
@@ -60,7 +61,7 @@ func UserAll(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 			}
 		}
 	}
-	t, err := template.ParseFiles("public/user.tpl")
+	t, err := template.ParseFiles(filepath.Join(myutil.PublicPath(), "user.tpl"))
 	if err != nil {
 		panic(err)
 	}

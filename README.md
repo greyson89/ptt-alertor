@@ -43,6 +43,35 @@ of the volume; to reset all data, remove the volume.
 docker compose down
 ```
 
+## Native Deployment (no Docker, e.g. Windows)
+
+Since storage is a single SQLite file with a pure-Go driver (no CGO), the binary has
+no external runtime dependencies and runs directly on Windows/macOS/Linux.
+
+1. Build (Go 1.26+):
+
+```bash
+go build -o ptt-alertor .          # or ptt-alertor.exe on Windows
+```
+
+2. The binary looks for its `public/` (templates) and `storage/` (SQLite file)
+   folders next to itself if they aren't found in the current working
+   directory — so it's safe to launch it via a shortcut, Task Scheduler, or a
+   Windows service, regardless of what directory that launcher starts in.
+
+3. Set the environment variables it needs (there is no `.env` auto-loading
+   outside Docker Compose) and run it. On Windows, copy `run.ps1.example` to
+   `run.ps1`, fill in your settings, and run `.\run.ps1`.
+
+4. `APP_HOST` must start with `https://` for the Telegram webhook to be
+   registered. On a machine without a public HTTPS domain (e.g. your own PC),
+   expose port 9090 through a tunnel such as [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+   or [ngrok](https://ngrok.com/) and set `APP_HOST` to that tunnel's URL —
+   otherwise the bot can send messages but won't receive your commands.
+
+5. To keep it running in the background on Windows, wrap it as a service with
+   [NSSM](https://nssm.cc/) or schedule it to start at login via Task Scheduler.
+
 ## API
 
 ### Board

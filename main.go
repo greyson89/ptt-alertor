@@ -14,6 +14,7 @@ import (
 	"github.com/watain666/ptt-alertor/channels/telegram"
 	ctrlr "github.com/watain666/ptt-alertor/controllers"
 	"github.com/watain666/ptt-alertor/jobs"
+	"github.com/watain666/ptt-alertor/myutil"
 )
 
 var (
@@ -39,7 +40,7 @@ func newRouter() *myRouter {
 	r := &myRouter{
 		Router: *httprouter.New(),
 	}
-	r.NotFound = http.FileServer(http.Dir("public"))
+	r.NotFound = http.FileServer(http.Dir(myutil.PublicPath()))
 	return r
 }
 

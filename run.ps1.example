@@ -1,0 +1,18 @@
+# Launch ptt-alertor from wherever this script lives, without hardcoding
+# any machine-specific path. $PSScriptRoot is always the folder this
+# run.ps1 file is sitting in, so this works no matter where you clone the
+# repo or from which directory you invoke the script.
+
+$root = $PSScriptRoot
+
+$env:AUTH_USER      = "admin"
+$env:AUTH_PW        = "changeme"
+$env:BOARD_HIGH     = "Gossiping,LoL"
+$env:TELEGRAM_TOKEN = "your-telegram-bot-token"
+$env:APP_HOST       = "http://localhost:9090"
+# SQLITE_PATH is optional - if unset, the binary stores its database
+# next to itself (in a "storage" folder), so it's usually fine to leave
+# this commented out.
+# $env:SQLITE_PATH  = Join-Path $root "storage\ptt-alertor.db"
+
+& (Join-Path $root "ptt-alertor.exe")
