@@ -26,7 +26,7 @@ func (cc categoryCleaner) Run() {
 
 	for _, boardName := range boardNames {
 		time.Sleep(100 * time.Millisecond)
-		if !rss.CheckBoardExist(boardName) {
+		if rss.CheckBoardNotFound(boardName) {
 			log.WithField("category", boardName).Info("Delete Category")
 			cc.CleanAccountSetting(boardName)
 			cc.CleanKeywordAuthorBoard(boardName)
