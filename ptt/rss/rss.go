@@ -25,19 +25,6 @@ func CheckBoardExist(board string) bool {
 	return true
 }
 
-// CheckBoardNotFound reports whether ptt.cc confirms the board is gone (HTTP 404).
-// Network errors, rate limiting and empty feeds are not treated as not found,
-// so a temporary failure never looks like a deleted board.
-func CheckBoardNotFound(board string) bool {
-	return isNotFound("https://www.ptt.cc/atom/" + board + ".xml")
-}
-
-func isNotFound(feedURL string) bool {
-	_, err := parseURL(feedURL)
-	herr, ok := err.(gofeed.HTTPError)
-	return ok && herr.StatusCode == http.StatusNotFound
-}
-
 func BuildArticles(board string) (articles article.Articles, err error) {
 	feed, err := parseURL("https://www.ptt.cc/atom/" + board + ".xml")
 	if err != nil {

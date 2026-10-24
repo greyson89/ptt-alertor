@@ -133,5 +133,4 @@ func init() {
 	jobs.NewPushSumKeyReplacer().Run()
 	jobs.NewGenerator().Run()
 	jobs.NewFetcher().Run()
-	jobs.NewCategoryCleaner().Run()
 }
